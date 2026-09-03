@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schweizer LIK Dashboard | Konsumentenpreise</title>
+  <!-- Favicon icon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23d80027'/><rect x='42' y='20' width='16' height='60' fill='white'/><rect x='20' y='42' width='60' height='16' fill='white'/></svg>">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Vendor Chart.js -->
+  <script src="js/vendor/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <div class="brand-section">
+      <div class="swiss-flag-icon">+</div>
+      <div class="brand-titles">
+        <h1 data-i18n="app_title">Schweizer Landesindex der Konsumentenpreise (LIK)</h1>
+        <div class="subtitle">
+          <span data-i18n="app_subtitle">BFS Makrodaten & Teuerungs-Dashboard</span>
+          <span>•</span>
+          <span id="basis-text">Basis Dezember 2025 = 100 | Quelle: BFS</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-controls">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-badge-text">Stand: Laden...</span>
+      </div>
+
+      <!-- Language Selector -->
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="de">DE</button>
+        <button class="lang-btn" data-lang="fr">FR</button>
+        <button class="lang-btn" data-lang="it">IT</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+
+      <!-- Upload Modal Trigger Button -->
+      <button class="btn-upload" id="btn-open-upload">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <span data-i18n="upload_btn">BFS-Datei hochladen (.xlsx)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-content">
+
+    <!-- Section 1: Executive Macro Overview ("Auf einen Blick") -->
+    <section>
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>📊</span> <span data-i18n="overview_title">Makro-Übersicht auf einen Blick</span>
+          </h2>
+          <p class="section-desc" data-i18n="overview_desc">Zentrale Indikatoren der Schweizer Inflation und Teuerungsentwicklung</p>
+        </div>
+      </div>
+
+      <!-- 4 Key Metric Cards -->
+      <div class="kpi-grid" id="kpi-cards-container">
+        <!-- Dynamically rendered by app.js -->
+      </div>
+    </section>
+
+    <!-- Section 2: Macro Comparative Charts & Inflation Drivers -->
+    <section class="analytics-grid">
+      
+      <!-- Macro Trend Comparison Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <h3 class="section-title" style="font-size: 1rem;">
+              <span data-i18n="macro_chart_title">Makro-Teuerungsverlauf im Zeitvergleich</span>
+            </h3>
+            <p class="section-desc" data-i18n="macro_chart_desc">Vergleich der zentralen Teuerungsaggregate</p>
+          </div>
+
+          <div class="chart-toolbar">
+            <!-- Metric Toggle -->
+            <div class="btn-group">
+              <button class="btn-toggle active" data-macro-metric="yoy" data-i18n="metric_yoy">YoY (%)</button>
+              <button class="btn-toggle" data-macro-metric="mom" data-i18n="metric_mom">MoM (%)</button>
+              <button class="btn-toggle" data-macro-metric="index" data-i18n="metric_index">Index (100)</button>
+            </div>
+
+            <!-- Time Range Toggle -->
+            <div class="btn-group">
+              <button class="btn-toggle" data-macro-range="1Y" data-i18n="range_1y">1J</button>
+              <button class="btn-toggle" data-macro-range="3Y" data-i18n="range_3y">3J</button>
+              <button class="btn-toggle active" data-macro-range="5Y" data-i18n="range_5y">5J</button>
+              <button class="btn-toggle" data-macro-range="10Y" data-i18n="range_10y">10J</button>
+              <button class="btn-toggle" data-macro-range="Max" data-i18n="range_max">Max</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="chart-container">
+          <canvas id="macro-chart-canvas"></canvas>
+        </div>
+
+        <!-- Toggleable series chips -->
+        <div class="chart-series-chips" id="macro-series-chips">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- 13 Main Groups & Contributions -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <h3 class="section-title" style="font-size: 1rem;">
+              <span data-i18n="drivers_title">Hauptgruppen: Beiträge & Gewichtung</span>
+            </h3>
+            <p class="section-desc" data-i18n="drivers_desc">Analyse der 13 COICOP-Hauptkategorien</p>
+          </div>
+
+          <div class="chart-toolbar">
+            <div class="btn-group">
+              <button class="btn-toggle active" data-drivers-mode="contr" data-i18n="btn_contr">Beitrag</button>
+              <button class="btn-toggle" data-drivers-mode="yoy" data-i18n="btn_yoy">YoY %</button>
+              <button class="btn-toggle" data-drivers-mode="weight" data-i18n="btn_weight">Gewicht</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <canvas id="drivers-chart-canvas"></canvas>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--gray-500); margin-top: 0.5rem; text-align: right;">
+          💡 Tipp: Klicke auf einen Balken, um direkt in diese Kategorie zu springen.
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Sondergliederungen Hub (BFS Spezial-Aggregate) -->
+    <section class="special-groups-hub">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">
+            <span>🏷️</span> <span data-i18n="special_hub_title">Spezial-Aggregate (Sondergliederungen)</span>
+          </h2>
+          <p class="section-desc" data-i18n="special_hub_desc">Offizielle BFS-Klassifizierungen nach Herkunft, Güterart und Kernraten</p>
+        </div>
+      </div>
+
+      <!-- Special Categories Tabs -->
+      <div class="special-tabs">
+        <button class="special-tab-btn active" data-special-tab="special_core" data-i18n="tab_core">Kerninflation</button>
+        <button class="special-tab-btn" data-special-tab="special_origin" data-i18n="tab_origin">Herkunft (Inland/Import)</button>
+        <button class="special-tab-btn" data-special-tab="special_goods" data-i18n="tab_goods">Waren & Dienstleistungen</button>
+        <button class="special-tab-btn" data-special-tab="special_admin" data-i18n="tab_admin">Administrierte Preise</button>
+        <button class="special-tab-btn" data-special-tab="special_exclusions" data-i18n="tab_exclusions">Spezifische Ausschlüsse</button>
+      </div>
+
+      <!-- Cards Grid -->
+      <div class="special-grid" id="special-grid">
+        <!-- Dynamically rendered -->
+      </div>
+    </section>
+
+    <!-- Section 4: Hierarchical Drill-Down Explorer -->
+    <section class="explorer-card" id="explorer-section">
+      <div class="explorer-header">
+        <div class="section-header" style="margin-bottom: 0.5rem;">
+          <div>
+            <h2 class="section-title">
+              <span>🔍</span> <span data-i18n="explorer_title">Hierarchischer Detail- & Kategorie-Explorer</span>
+            </h2>
+            <p class="section-desc" data-i18n="explorer_desc">Stufenloser Drilldown von den 13 Hauptgruppen bis auf Produktebene</p>
+          </div>
+        </div>
+
+        <!-- Breadcrumbs Navigation -->
+        <div class="breadcrumbs-container" id="breadcrumbs">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Current Node Summary Card -->
+        <div class="current-node-summary" id="current-node-summary">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Search & Controls Bar -->
+      <div class="explorer-controls">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="search-input" 
+                 placeholder="Kategorie oder Produkt suchen (Name, COICOP, Code)..." 
+                 data-i18n-placeholder="search_placeholder">
+        </div>
+        <div style="font-size:0.75rem; color:var(--gray-500);">
+          💡 Klick auf eine Zeile führt zum Drilldown in die Unterebene
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div class="table-container">
+        <table class="cpi-table">
+          <thead>
+            <tr>
+              <th data-sort="coicop" data-i18n="th_coicop">COICOP</th>
+              <th data-sort="code" data-i18n="th_code">BFS-Code</th>
+              <th data-sort="name" data-i18n="th_name">Bezeichnung</th>
+              <th data-sort="weight" class="col-num" data-i18n="th_weight">Gewicht (%)</th>
+              <th data-sort="index" class="col-num" data-i18n="th_index">Index</th>
+              <th data-sort="mom" class="col-num" data-i18n="th_mom">MoM (%)</th>
+              <th data-sort="yoy" class="col-num" data-i18n="th_yoy">YoY (%)</th>
+              <th data-sort="contr_mom" class="col-num" data-i18n="th_contr_mom">Beitrag MoM</th>
+              <th data-sort="contr_yoy" class="col-num" data-i18n="th_contr_yoy">Beitrag YoY</th>
+              <th style="text-align: right;" data-i18n="th_actions">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p data-i18n="footer_text">LUKB Makrodaten CPI Dashboard • Bundesamt für Statistik (BFS) Landesindex der Konsumentenpreise</p>
+    </footer>
+
+  </main>
+
+  <!-- Detail Deep-Dive Modal -->
+  <div class="modal-backdrop" id="detail-modal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modal-title">Detailanalyse</h3>
+          <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 2px;" id="modal-coicop">COICOP: —</div>
+        </div>
+        <button class="modal-close-btn" id="btn-modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Key statistics grid -->
+        <div class="kpi-grid" id="modal-stats-container" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Chart Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div class="btn-group">
+            <button class="btn-toggle active" data-modal-metric="yoy" data-i18n="metric_yoy">YoY (%)</button>
+            <button class="btn-toggle" data-modal-metric="mom" data-i18n="metric_mom">MoM (%)</button>
+            <button class="btn-toggle" data-modal-metric="index" data-i18n="metric_index">Index (100)</button>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn-toggle" data-modal-range="1Y" data-i18n="range_1y">1J</button>
+            <button class="btn-toggle" data-modal-range="3Y" data-i18n="range_3y">3J</button>
+            <button class="btn-toggle active" data-modal-range="5Y" data-i18n="range_5y">5J</button>
+            <button class="btn-toggle" data-modal-range="Max" data-i18n="range_max">Max</button>
+          </div>
+        </div>
+
+        <!-- Chart Canvas -->
+        <div style="position: relative; width: 100%; height: 300px;">
+          <canvas id="modal-chart-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Modal -->
+  <div class="modal-backdrop" id="upload-modal">
+    <div class="modal-dialog" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title" data-i18n="upload_modal_title">Aktuelle BFS CPI Excel-Datei hochladen</h3>
+        <button class="modal-close-btn" id="btn-close-upload">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-icon">📁</div>
+          <div class="dropzone-text" data-i18n="dropzone_title">Ziehe deine BFS-Excel-Datei hierher</div>
+          <div class="dropzone-subtext" data-i18n="dropzone_sub">oder klicke zum Durchsuchen (.xlsx Dateien)</div>
+          <input type="file" id="hidden-file-input" accept=".xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display: none;">
+        </div>
+
+        <!-- Shiny File Input Control -->
+        <div id="shiny-upload-container" style="margin: 0.5rem 0;">
+          {{ upload_control }}
+        </div>
+
+        <div style="text-align: center; min-height: 24px;">
+          <span class="upload-spinner" id="upload-spinner" style="display: none;"></span>
+          <span id="upload-status-msg" style="font-size: 0.8rem; color: var(--gray-600); margin-left: 0.5rem;"></span>
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--gray-500); background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 0.75rem;">
+          ℹ️ <strong>Dateiname ist beliebig:</strong> Das Backend verarbeitet die interne BFS-Struktur (INDEX_m, VAR_m-1, VAR_m-12, CONTR_m). Nach erfolgreicher Extraktion aktualisiert sich das Dashboard automatisch.
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+          <button class="drilldown-btn" id="btn-cancel-upload" style="padding: 0.5rem 1rem;" data-i18n="btn_cancel">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Main Application Script -->
+  <script src="js/app.js"></script>
+
+</body>
+</html>
