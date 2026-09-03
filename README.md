@@ -86,7 +86,22 @@ Rscript extract_cpi_data.R "mein_neuer_cpi_download.xlsx"
     ├── css/
     │   └── styles.css        # Institutionelles LUKB/Swiss-Macro Styling
     ├── js/
-    │   ├── app.js            # App-Logik, I18n, Drilldown, Chart-Rendering
+    │   ├── main.js           # Einstiegspunkt & App-Koordination (ES6-Module)
+    │   ├── state.js          # Zentraler State-Store
+    │   ├── i18n/             # Sprachwörterbücher & Übersetzer
+    │   │   ├── index.js
+    │   │   ├── de.js, fr.js, it.js, en.js
+    │   ├── services/         # Datenabruf, Cache & R-Shiny WebSocket Bridge
+    │   │   ├── dataService.js
+    │   │   └── shinyBridge.js
+    │   ├── utils/            # Hilfsfunktionen & BFS/COICOP-Hierarchie
+    │   │   ├── formatters.js
+    │   │   ├── helpers.js
+    │   │   └── cpiHierarchy.js
+    │   ├── components/       # Isolierte UI- & Chart-Komponenten
+    │   │   ├── header.js, kpiCards.js, macroChart.js
+    │   │   ├── driversChart.js, specialHub.js, explorer.js
+    │   │   ├── detailModal.js, uploadModal.js
     │   └── vendor/
     │       └── chart.umd.min.js  # Chart.js v4 (lokal gebündelt)
     └── data/
