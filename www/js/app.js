@@ -1025,6 +1025,9 @@
     const item = getItem(state.currentNodeCode);
     if (!item) return;
 
+    const drillableChildren = (item.children || []).filter(c => getItem(c));
+    const subCount = drillableChildren.length;
+
     dom.currentNodeSummary.innerHTML = `
       <div>
         <div class="node-info-title">
@@ -1032,7 +1035,7 @@
           ${getItemName(item)}
         </div>
         <div style="font-size:0.75rem; color:var(--gray-500); margin-top:2px;">
-          ${item.children ? item.children.length : 0} ${t('items_count')} • Code: ${getBfsCode(item)}
+          ${subCount} ${t('items_count')} • Code: ${getBfsCode(item)}
         </div>
       </div>
       <div class="node-stats-group">
@@ -1130,9 +1133,9 @@
     }
 
     itemsToDisplay.forEach(item => {
-      const hasChildren = item.children && item.children.length > 0;
+      const canDrill = hasDrilldownChildren(item);
       const tr = document.createElement('tr');
-      if (hasChildren) tr.classList.add('clickable-row');
+      if (canDrill) tr.classList.add('clickable-row');
 
       // Level badge text
       let levelLabel = '';
@@ -1174,7 +1177,7 @@
           </div>
         </td>
         <td style="text-align: right; white-space: nowrap;">
-          ${hasChildren ? `
+          ${canDrill ? `
             <button class="drilldown-btn" onclick="event.stopPropagation(); window.cpiApp.drillDown('${item.code}')">
               <span>${t('action_drilldown')}</span> &rarr;
             </button>
@@ -1185,7 +1188,7 @@
         </td>
       `;
 
-      if (hasChildren) {
+      if (canDrill) {
         tr.onclick = () => drillDownToNode(item.code);
       } else {
         tr.onclick = () => window.cpiApp.openDetailModal(item.code);
@@ -1195,13 +1198,54 @@
     });
   }
 
+  // Reconstruct exact ancestral path for any node (from 100_100 down to code)
+  function buildAncestralPath(code) {
+    const path = [];
+    let curr = getItem(code);
+    while (curr) {
+      path.unshift(curr.code);
+      if (curr.code === '100_100' || !curr.parent) break;
+      curr = getItem(curr.parent);
+    }
+    if (path.length === 0 || path[0] !== '100_100') {
+      path.unshift('100_100');
+    }
+    return path;
+  }
+
+  // Check if an item has meaningful children to drill down into
+  function hasDrilldownChildren(item) {
+    if (!item || !item.children || item.children.length === 0) return false;
+    // If it only has 1 child and that child has no children and has the exact same name, it's a leaf endpoint
+    if (item.children.length === 1) {
+      const singleChild = getItem(item.children[0]);
+      if (!singleChild) return false;
+      const childHasChildren = singleChild.children && singleChild.children.length > 0;
+      const sameName = getItemName(singleChild).trim().toLowerCase() === getItemName(item).trim().toLowerCase();
+      if (!childHasChildren && sameName) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function drillDownToNode(code) {
     state.activeSearchTerm = '';
     dom.searchInput.value = '';
-    state.currentNodeCode = code;
-    if (!state.breadcrumbPath.includes(code)) {
-      state.breadcrumbPath.push(code);
+
+    const item = getItem(code);
+    if (!item) return;
+
+    // If item has no meaningful sub-items, open detail chart modal directly!
+    if (!hasDrilldownChildren(item)) {
+      window.cpiApp.openDetailModal(code);
+      return;
     }
+
+    // Set correct node and construct clean ancestral breadcrumb path
+    state.currentNodeCode = code;
+    state.breadcrumbPath = buildAncestralPath(code);
+
     renderExplorer();
   }
 
