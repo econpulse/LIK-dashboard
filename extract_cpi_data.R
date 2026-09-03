@@ -398,7 +398,7 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
   for (k in names(items_list)) {
     it <- items_list[[k]]
     has_history <- k %in% key_chart_codes
-    summary_items[[k]] <- list(
+    item_entry <- list(
       code = it$code,
       bfs_code = it$bfs_code,
       pos_no = it$pos_no,
@@ -410,9 +410,12 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
       group_type = it$group_type,
       names = it$names,
       weight = it$weight,
-      latest = it$latest,
-      history = if (has_history) it$history else NULL
+      latest = it$latest
     )
+    if (has_history) {
+      item_entry$history <- it$history
+    }
+    summary_items[[k]] <- item_entry
   }
   
   summary_data <- list(

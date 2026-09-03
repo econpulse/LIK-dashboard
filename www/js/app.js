@@ -431,6 +431,14 @@
     return [];
   }
 
+  // Helper: check if item has non-empty time-series history
+  function getItemHistory(item) {
+    if (!item || !item.history) return null;
+    if (Array.isArray(item.history.index) && item.history.index.length > 0) return item.history;
+    if (Array.isArray(item.history.yoy) && item.history.yoy.length > 0) return item.history;
+    return null;
+  }
+
   function formatNum(val, decimals = 2, withSign = false) {
     if (val === null || val === undefined || isNaN(val)) return '—';
     const sign = withSign && val > 0 ? '+' : '';
@@ -1339,27 +1347,34 @@
     let item = getItem(code);
     if (!item) return;
 
-    // If item doesn't have full history, try to get it from fullData
-    if (!item.history && state.fullData && state.fullData.items && state.fullData.items[code]) {
-      item = state.fullData.items[code];
-    } else if (!item.history) {
-      // Fetch full data on demand
-      try {
-        const fullResp = await fetch('data/cpi_data.json');
-        if (fullResp.ok) {
-          state.fullData = await fullResp.json();
-          if (state.fullData.items[code]) {
-            item = state.fullData.items[code];
-          }
-        }
-      } catch (e) {
-        console.warn('Could not fetch full data for item:', e);
-      }
-    }
-
+    // Open modal immediately so user gets visual feedback
     state.modalItem = item;
-    renderModalContent(item);
     dom.detailModal.classList.add('open');
+    renderModalContent(item);
+
+    // If item doesn't have real time-series history, fetch fullData on-demand
+    if (!getItemHistory(item)) {
+      if (state.fullData && state.fullData.items && state.fullData.items[code] && getItemHistory(state.fullData.items[code])) {
+        item = state.fullData.items[code];
+      } else {
+        try {
+          // Show brief loading indicator on modal stats
+          const fullResp = await fetch('data/cpi_data.json');
+          if (fullResp.ok) {
+            state.fullData = await fullResp.json();
+            if (state.fullData.items && state.fullData.items[code]) {
+              item = state.fullData.items[code];
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch full data for item:', e);
+          showToast('Zeitreihendaten konnten nicht geladen werden', 'error');
+        }
+      }
+
+      state.modalItem = item;
+      renderModalContent(item);
+    }
   }
 
   function renderModalContent(item) {
@@ -1367,8 +1382,10 @@
     const coicop = getCoicopCode(item);
     dom.modalCoicop.textContent = coicop ? `COICOP: ${coicop} | Code: ${getBfsCode(item)}` : `Code: ${getBfsCode(item)}`;
 
+    const historyObj = getItemHistory(item);
+
     // Statistics
-    const history = item.history ? item.history.yoy : [];
+    const history = historyObj ? historyObj.yoy : [];
     let avg12 = '—', min12 = '—', max12 = '—';
     if (history && history.length > 0) {
       const last12 = history.slice(-12).filter(v => v !== null && !isNaN(v));
@@ -1383,11 +1400,11 @@
     dom.modalStatsContainer.innerHTML = `
       <div class="kpi-card" style="padding:0.75rem;">
         <span class="kpi-detail-label">${t('stat_latest')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatNum(item.latest.index, 2)} Pts</span>
+        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatNum(item.latest ? item.latest.index : 0, 2)} Pts</span>
       </div>
       <div class="kpi-card" style="padding:0.75rem;">
         <span class="kpi-detail-label">${t('yoy_rate')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatRateBadge(item.latest.yoy)}</span>
+        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatRateBadge(item.latest ? item.latest.yoy : 0)}</span>
       </div>
       <div class="kpi-card" style="padding:0.75rem;">
         <span class="kpi-detail-label">${t('stat_avg12')}</span>
@@ -1399,7 +1416,7 @@
       </div>
       <div class="kpi-card" style="padding:0.75rem;">
         <span class="kpi-detail-label">${t('stat_weight')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${item.weight}%</span>
+        <span class="kpi-detail-val" style="font-size:1.1rem;">${item.weight || 0}%</span>
       </div>
     `;
 
@@ -1407,12 +1424,13 @@
   }
 
   function renderModalChart(item) {
-    if (!window.Chart || !item.history) return;
+    const historyObj = getItemHistory(item);
+    if (!window.Chart || !historyObj) return;
 
     const dates = state.summaryData.meta.dates;
     const { startIdx } = filterDatesByRange(dates, state.modalTimeframe);
     const chartDates = dates.slice(startIdx);
-    const rawData = item.history[state.modalMetric] || [];
+    const rawData = historyObj[state.modalMetric] || [];
     const dataSlice = rawData.slice(startIdx);
 
     const metricUnit = state.modalMetric === 'index' ? 'Pts' : '%';
