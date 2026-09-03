@@ -90,4 +90,18 @@ export function initUploadModal() {
       }
     });
   }
+
+  const shinyFileInput = document.querySelector('input[type="file"][name="cpi_file_upload"]') ||
+                         document.querySelector('#cpi_file_upload');
+  if (shinyFileInput) {
+    shinyFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const uploadSpinner = document.getElementById('upload-spinner');
+        const uploadStatusMsg = document.getElementById('upload-status-msg');
+        if (uploadSpinner) uploadSpinner.style.display = 'inline-block';
+        if (uploadStatusMsg) uploadStatusMsg.textContent = `${t('upload_processing')} (${file.name})`;
+      }
+    });
+  }
 }
