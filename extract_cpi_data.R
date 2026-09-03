@@ -4,7 +4,7 @@
 # ==============================================================================
 
 suppressPackageStartupMessages({
-  library(openxlsx)
+  library(readxl)
   library(jsonlite)
 })
 
@@ -33,24 +33,25 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
     stop(sprintf("Datei nicht gefunden: %s", xlsx_path))
   }
   
-  wb <- loadWorkbook(xlsx_path)
-  sheet_names <- names(wb)
+  sheet_names <- excel_sheets(xlsx_path)
   cat(sprintf("[CPI Extractor] Vorhandene Sheets: %s\n", paste(sheet_names, collapse = ", ")))
   
   # 1. Metadaten aus den ersten Zeilen von INDEX_m extrahieren
-  raw_header <- read.xlsx(wb, sheet = "INDEX_m", rows = 1:4, colNames = FALSE)
+  raw_header <- as.data.frame(read_excel(xlsx_path, sheet = "INDEX_m", n_max = 4, col_names = FALSE, .name_repair = "minimal"))
   title_de <- as.character(raw_header[1, 1])
   basket_str <- as.character(raw_header[2, 1])
   base_str <- as.character(raw_header[3, 1])
   
   cat(sprintf("[CPI Extractor] Titel: %s | %s | %s\n", title_de, basket_str, base_str))
   
-  # 2. Relevante Sheets einlesen (Start bei Zeile 4 = Header)
-  idx_df <- read.xlsx(wb, sheet = "INDEX_m", startRow = 4)
-  var_m1_df <- read.xlsx(wb, sheet = "VAR_m-1", startRow = 4)
-  var_m12_df <- read.xlsx(wb, sheet = "VAR_m-12", startRow = 4)
+  # 2. Relevante Sheets einlesen (Header in Zeile 4 -> skip = 3)
+  idx_df <- as.data.frame(read_excel(xlsx_path, sheet = "INDEX_m", skip = 3, .name_repair = "minimal"))
+  var_m1_df <- as.data.frame(read_excel(xlsx_path, sheet = "VAR_m-1", skip = 3, .name_repair = "minimal"))
+  var_m12_df <- as.data.frame(read_excel(xlsx_path, sheet = "VAR_m-12", skip = 3, .name_repair = "minimal"))
   
-  contr_df <- if ("CONTR_m" %in% sheet_names) read.xlsx(wb, sheet = "CONTR_m", startRow = 4) else NULL
+  contr_df <- if ("CONTR_m" %in% sheet_names) {
+    as.data.frame(read_excel(xlsx_path, sheet = "CONTR_m", skip = 3, .name_repair = "minimal"))
+  } else NULL
   
   # Bereinigen von Leer- und Fußnotenzeilen am Ende
   idx_df <- idx_df[!is.na(idx_df[["Position_D"]]), ]

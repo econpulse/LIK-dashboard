@@ -5,7 +5,7 @@
 
 suppressPackageStartupMessages({
   library(shiny)
-  library(openxlsx)
+  library(readxl)
   library(jsonlite)
 })
 
