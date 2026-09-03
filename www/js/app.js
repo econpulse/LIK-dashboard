@@ -423,6 +423,14 @@
     return '';
   }
 
+  // Defensive helper: guarantees children is always a JavaScript Array
+  function getItemChildren(item) {
+    if (!item || !item.children) return [];
+    if (Array.isArray(item.children)) return item.children;
+    if (typeof item.children === 'string' && item.children.length > 0) return [item.children];
+    return [];
+  }
+
   function formatNum(val, decimals = 2, withSign = false) {
     if (val === null || val === undefined || isNaN(val)) return '—';
     const sign = withSign && val > 0 ? '+' : '';
@@ -1040,7 +1048,8 @@
     const item = getItem(state.currentNodeCode);
     if (!item) return;
 
-    const drillableChildren = (item.children || []).filter(c => getItem(c));
+    const childCodes = getItemChildren(item);
+    const drillableChildren = childCodes.filter(c => getItem(c));
     const subCount = drillableChildren.length;
 
     dom.currentNodeSummary.innerHTML = `
@@ -1094,7 +1103,7 @@
       });
     } else {
       // Normal hierarchical view: show children of current node
-      const childCodes = parent.children || [];
+      const childCodes = getItemChildren(parent);
       childCodes.forEach(code => {
         const child = getItem(code);
         if (child) itemsToDisplay.push(child);
@@ -1234,16 +1243,18 @@
 
   // Check if an item has meaningful children to drill down into
   function hasDrilldownChildren(item) {
-    if (!item || !item.children || item.children.length === 0) return false;
+    const rawChildren = getItemChildren(item);
+    if (rawChildren.length === 0) return false;
     
     // Filter actual existing children in dataset
-    const validChildren = item.children.map(c => getItem(c)).filter(Boolean);
+    const validChildren = rawChildren.map(c => getItem(c)).filter(Boolean);
     if (validChildren.length === 0) return false;
 
     // If it only has 1 child and that child has no children and has the exact same name, it's a leaf endpoint
     if (validChildren.length === 1) {
       const singleChild = validChildren[0];
-      const childHasChildren = singleChild.children && singleChild.children.length > 0;
+      const singleChildChildren = getItemChildren(singleChild);
+      const childHasChildren = singleChildChildren.length > 0;
       const sameName = getItemName(singleChild).trim().toLowerCase() === getItemName(item).trim().toLowerCase();
       if (!childHasChildren && sameName) {
         return false;
