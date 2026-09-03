@@ -1,17 +1,20 @@
 /**
- * Data Service for Fetching and Caching CPI Datasets
+ * Data Service for Fetching, Caching, and Background Prefetching of CPI Datasets
  */
 import { state } from '../state.js';
 import { showToast } from '../utils/helpers.js';
 import { getItemHistory } from '../utils/cpiHierarchy.js';
 
+let fullDataFetchPromise = null;
+
 export async function loadSummaryData(forceRefresh = false) {
   try {
     if (forceRefresh) {
-      state.fullData = null; // Cache bei explizitem Reload / Upload invalidieren
+      state.fullData = null; // Invalidate cache on explicit reload/upload
+      fullDataFetchPromise = null;
     }
 
-    // Cache-Busting nur bei forceRefresh, sonst normale HTTP-Caching / ETags nutzen
+    // Cache-busting only on forceRefresh, otherwise standard HTTP caching/ETags
     const cacheBust = forceRefresh ? `?v=${Date.now()}` : '';
     const summaryResp = await fetch(`data/cpi_summary.json${cacheBust}`);
     if (!summaryResp.ok) throw new Error('Could not load cpi_summary.json');
@@ -34,15 +37,50 @@ export function getItem(code) {
   return null;
 }
 
+/**
+ * Initiates background prefetching of the complete dataset during browser idle time
+ */
+export function prefetchFullData(forceRefresh = false) {
+  if (state.fullData && !forceRefresh) {
+    return Promise.resolve(state.fullData);
+  }
+
+  if (fullDataFetchPromise) {
+    return fullDataFetchPromise;
+  }
+
+  const cacheBust = forceRefresh ? `?v=${Date.now()}` : '';
+  fullDataFetchPromise = fetch(`data/cpi_data.json${cacheBust}`)
+    .then(resp => {
+      if (!resp.ok) throw new Error('Could not load cpi_data.json');
+      return resp.json();
+    })
+    .then(data => {
+      state.fullData = data;
+      fullDataFetchPromise = null;
+      return data;
+    })
+    .catch(err => {
+      console.warn('Background prefetch failed (will retry on user demand):', err);
+      fullDataFetchPromise = null;
+    });
+
+  return fullDataFetchPromise;
+}
+
+/**
+ * Resolves full dataset for items needing full time series history
+ */
 export async function loadFullDataIfNeeded(items) {
   const needsFullData = items.some(it => !getItemHistory(it));
   if (!needsFullData) return items;
 
   if (!state.fullData) {
     try {
-      const fullResp = await fetch('data/cpi_data.json');
-      if (fullResp.ok) {
-        state.fullData = await fullResp.json();
+      if (fullDataFetchPromise) {
+        await fullDataFetchPromise;
+      } else {
+        await prefetchFullData();
       }
     } catch (e) {
       console.warn('Could not fetch full data for item:', e);

@@ -1,10 +1,10 @@
 /**
  * Swiss CPI Dashboard - Main Entry Point
- * ES6 Modular Architecture
+ * ES6 Modular Architecture with Idle Background Prefetching
  */
 import { state } from './state.js';
 import { applyStaticTranslations } from './i18n/index.js';
-import { loadSummaryData } from './services/dataService.js';
+import { loadSummaryData, prefetchFullData } from './services/dataService.js';
 import { initShinyBridge } from './services/shinyBridge.js';
 import { showToast } from './utils/helpers.js';
 
@@ -36,12 +36,29 @@ export function refreshUI() {
 }
 
 /**
+ * Schedules background prefetching of full time-series data when browser is idle
+ */
+function scheduleBackgroundPrefetch(forceRefresh = false) {
+  const runPrefetch = () => {
+    prefetchFullData(forceRefresh);
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(runPrefetch, { timeout: 2000 });
+  } else {
+    setTimeout(runPrefetch, 800);
+  }
+}
+
+/**
  * Loads data from backend/json and triggers full render
  */
 export async function loadAndRenderData(forceRefresh = false) {
   try {
     await loadSummaryData(forceRefresh);
     refreshUI();
+    // Start prefetching full dataset immediately in background while user views the dashboard
+    scheduleBackgroundPrefetch(forceRefresh);
   } catch (err) {
     console.error('Failed to load & render CPI data:', err);
   }
