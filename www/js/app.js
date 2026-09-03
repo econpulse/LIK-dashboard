@@ -487,8 +487,12 @@
   // ============================================================================
   async function loadData(forceRefresh = false) {
     try {
-      // Immer Cache-Busting verwenden, damit Browser-Updates sofort sichtbar sind
-      const cacheBust = `?v=${Date.now()}`;
+      if (forceRefresh) {
+        state.fullData = null; // Cache bei explizitem Reload / Upload invalidieren
+      }
+
+      // Cache-Busting nur bei forceRefresh, sonst normale HTTP-Caching / ETags nutzen
+      const cacheBust = forceRefresh ? `?v=${Date.now()}` : '';
       const summaryResp = await fetch(`data/cpi_summary.json${cacheBust}`);
       if (!summaryResp.ok) throw new Error('Could not load cpi_summary.json');
       state.summaryData = await summaryResp.json();
@@ -498,18 +502,14 @@
       
       // Render components
       renderKPIs();
+      renderMacroSeriesChips();
       renderMacroChart();
       renderDriversChart();
       renderSpecialHub();
       renderExplorer();
 
-      // Lazy load full data for deep-dive charts if needed
-      fetch(`data/cpi_data.json${cacheBust}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(full => {
-          if (full) state.fullData = full;
-        })
-        .catch(err => console.warn('Background full data load:', err));
+      // Hinweis: cpi_data.json (4.7 MB) wird NICHT mehr beim Start im Hintergrund geladen,
+      // sondern strictly On-Demand beim Klick auf ein Detailmodal (openDetailModal).
 
     } catch (err) {
       console.error('Data load error:', err);
@@ -547,6 +547,7 @@
 
     updateHeaderInfo();
     renderKPIs();
+    renderMacroSeriesChips();
     renderMacroChart();
     renderDriversChart();
     renderSpecialHub();
@@ -739,7 +740,6 @@
 
   function renderMacroChart() {
     if (!state.summaryData || !window.Chart) return;
-    renderMacroSeriesChips();
 
     const dates = state.summaryData.meta.dates;
     const { startIdx, count } = filterDatesByRange(dates, state.macroTimeframe);
@@ -767,11 +767,17 @@
       });
     });
 
-    if (state.charts.macro) {
-      state.charts.macro.destroy();
-    }
-
     const metricUnit = state.macroMetric === 'index' ? 'Pts' : '%';
+
+    if (state.charts.macro) {
+      state.charts.macro.data.labels = chartDates;
+      state.charts.macro.data.datasets = datasets;
+      state.charts.macro.options.scales.y.ticks.callback = function (val) {
+        return val.toFixed(1) + (state.macroMetric === 'index' ? '' : '%');
+      };
+      state.charts.macro.update('none');
+      return;
+    }
 
     state.charts.macro = new Chart(dom.macroChartCanvas, {
       type: 'line',
@@ -893,11 +899,31 @@
       return val >= 0 ? '#e11d48' : '#059669';
     });
 
-    if (state.charts.drivers) {
-      state.charts.drivers.destroy();
-    }
-
     const unit = (state.driversMode === 'contr' || state.driversMode === 'contr_yoy' || state.driversMode === 'delta_yoy') ? ' %p' : ' %';
+
+    if (state.charts.drivers) {
+      state.charts.drivers.data.labels = labels;
+      state.charts.drivers.data.datasets[0].data = values;
+      state.charts.drivers.data.datasets[0].backgroundColor = colors;
+      state.charts.drivers.options.scales.x.ticks.callback = function (val) {
+        return val.toFixed(1) + unit;
+      };
+      state.charts.drivers.options.plugins.tooltip.callbacks.label = function (ctx) {
+        return ` ${ctx.parsed.x.toFixed(3)}${unit}`;
+      };
+      state.charts.drivers.options.onClick = (event, elements) => {
+        if (elements.length > 0) {
+          const idx = elements[0].index;
+          const clickedItem = displayList[idx];
+          if (clickedItem) {
+            drillDownToNode(clickedItem.code);
+            document.getElementById('explorer-section').scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+      };
+      state.charts.drivers.update('none');
+      return;
+    }
 
     state.charts.drivers = new Chart(dom.driversChartCanvas, {
       type: 'bar',
@@ -1143,6 +1169,13 @@
       return state.sortAsc ? vA - vB : vB - vA;
     });
 
+    let totalMatches = itemsToDisplay.length;
+    let isSearchLimited = false;
+    if (searchTerm.length >= 2 && itemsToDisplay.length > 80) {
+      itemsToDisplay = itemsToDisplay.slice(0, 80);
+      isSearchLimited = true;
+    }
+
     dom.tableBody.innerHTML = '';
 
     if (itemsToDisplay.length === 0) {
@@ -1222,6 +1255,16 @@
 
       fragment.appendChild(tr);
     });
+
+    if (isSearchLimited) {
+      const noticeTr = document.createElement('tr');
+      noticeTr.innerHTML = `
+        <td colspan="10" style="text-align: center; padding: 0.75rem; background-color: var(--gray-50); color: var(--gray-600); font-size: 0.8rem;">
+          ℹ️ Zeige die ersten 80 von ${totalMatches} Treffern. Bitte verfeinere deine Suche für spezifischere Ergebnisse.
+        </td>
+      `;
+      fragment.appendChild(noticeTr);
+    }
 
     dom.tableBody.appendChild(fragment);
   }
@@ -1372,11 +1415,23 @@
     const rawData = item.history[state.modalMetric] || [];
     const dataSlice = rawData.slice(startIdx);
 
-    if (state.charts.modal) {
-      state.charts.modal.destroy();
-    }
-
     const metricUnit = state.modalMetric === 'index' ? 'Pts' : '%';
+
+    if (state.charts.modal) {
+      state.charts.modal.data.labels = chartDates;
+      state.charts.modal.data.datasets[0].label = getItemName(item);
+      state.charts.modal.data.datasets[0].data = dataSlice;
+      state.charts.modal.data.datasets[0].pointRadius = chartDates.length > 36 ? 0 : 2;
+      state.charts.modal.options.plugins.tooltip.callbacks.label = function (ctx) {
+        const v = ctx.parsed.y;
+        return ` ${v !== null ? v.toFixed(2) + ' ' + metricUnit : '—'}`;
+      };
+      state.charts.modal.options.scales.y.ticks.callback = function (val) {
+        return val.toFixed(1) + (state.modalMetric === 'index' ? '' : '%');
+      };
+      state.charts.modal.update('none');
+      return;
+    }
 
     state.charts.modal = new Chart(dom.modalChartCanvas, {
       type: 'line',
