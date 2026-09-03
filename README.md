@@ -18,11 +18,11 @@ Interaktives, mehrsprachiges Konsumentenpreis-Dashboard für Schweizer Daten (Bu
 ## Hauptfunktionen
 
 1. **Makro-Übersicht auf einen Blick**:
-   - 4 KPI-Karten mit Indexstand, Monatsrate (MoM), Vorjahresrate (YoY) und Teuerungsbeiträgen:
-     - **Gesamtindex (LIK)**
-     - **Kerninflation 1** (exkl. Frische/saisonale Produkte und Energie/Treibstoffe)
-     - **Inland- vs. Importgüter** (entscheidend für Schweizer Franken / Wechselkurseffekte)
-     - **Waren vs. Dienstleistungen** (Dauerhafte Güter vs. Private Dienstleistungen)
+   - 4 interaktive KPI-Karten mit Klick-Funktion für sofortiges Detail-/Chart-Popup:
+     - **Gesamtindex (LIK)**: Klick öffnet Detailanalyse der Gesamtreihe.
+     - **Kerninflation 1**: Klick öffnet Detailanalyse der Kerninflation 1.
+     - **Inland- vs. Importgüter**: Klick öffnet direkten Dual-Serien-Chartvergleich beider Reihen.
+     - **Waren vs. Dienstleistungen**: Klick öffnet direkten Dual-Serien-Chartvergleich beider Aggregate.
 2. **Interaktiver Makro-Vergleichschart**:
    - Multi-Linien-Chart mit Umschaltung zwischen **Vorjahresrate YoY (%)**, **Monatsrate MoM (%)** und **Indexstand (100)**.
    - Zeitbereichswähler: **1 Jahr**, **3 Jahre**, **5 Jahre**, **10 Jahre** oder **Max (seit 1982)**.

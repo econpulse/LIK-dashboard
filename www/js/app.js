@@ -588,7 +588,7 @@
 
     const cardsHtml = `
       <!-- Card 1: Headline CPI -->
-      <div class="kpi-card">
+      <div class="kpi-card" onclick="window.cpiApp.openDetailModal('100_100')" style="cursor: pointer;">
         <div class="kpi-card-header">
           <span class="kpi-title">${t('kpi_headline')}</span>
           <span class="kpi-weight">${t('weight')} 100%</span>
@@ -642,7 +642,7 @@
       </div>
 
       <!-- Card 3: Domestic vs Imported -->
-      <div class="kpi-card">
+      <div class="kpi-card" onclick="window.cpiApp.openDetailModal(['sp_1819_118', 'sp_1819_119'])" style="cursor: pointer;">
         <div class="kpi-card-header">
           <span class="kpi-title">${t('kpi_origin')}</span>
           <span class="kpi-weight">77.8% / 22.2%</span>
@@ -674,7 +674,7 @@
       </div>
 
       <!-- Card 4: Goods vs Services -->
-      <div class="kpi-card">
+      <div class="kpi-card" onclick="window.cpiApp.openDetailModal(['sp_110_101', 'sp_110_102'])" style="cursor: pointer;">
         <div class="kpi-card-header">
           <span class="kpi-title">${t('kpi_goods_services')}</span>
           <span class="kpi-weight">37.6% / 62.4%</span>
@@ -1341,30 +1341,40 @@
   }
 
   // ============================================================================
-  // 6. Detail Deep-Dive Modal
+  // 6. Detail Deep-Dive Modal (Single or Multi-Series)
   // ============================================================================
-  async function openDetailModal(code) {
-    let item = getItem(code);
-    if (!item) return;
+  const SERIES_COLOR_MAP = {
+    '100_100': '#0f172a',      // Gesamtindex (Dunkelblau/Schwarz)
+    'sp_1170_103': '#e11d48',  // Kern 1 (Rot)
+    'sp_1170_302': '#f59e0b',  // Kern 2 (Orange)
+    'sp_1819_118': '#059669',  // Inland (Grün)
+    'sp_1819_119': '#2563eb',  // Import (Blau)
+    'sp_110_101': '#8b5cf6',   // Waren (Lila)
+    'sp_110_102': '#06b6d4'    // Dienstleistungen (Cyan)
+  };
+
+  const DEFAULT_PALETTE = [
+    '#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed', '#0891b2'
+  ];
+
+  async function openDetailModal(codes) {
+    const codeList = Array.isArray(codes) ? codes : [codes];
+    let items = codeList.map(c => getItem(c)).filter(Boolean);
+    if (items.length === 0) return;
 
     // Open modal immediately so user gets visual feedback
-    state.modalItem = item;
+    state.modalItem = items;
     dom.detailModal.classList.add('open');
-    renderModalContent(item);
+    renderModalContent(items);
 
-    // If item doesn't have real time-series history, fetch fullData on-demand
-    if (!getItemHistory(item)) {
-      if (state.fullData && state.fullData.items && state.fullData.items[code] && getItemHistory(state.fullData.items[code])) {
-        item = state.fullData.items[code];
-      } else {
+    // Check if any item lacks time-series history
+    const needsFullData = items.some(it => !getItemHistory(it));
+    if (needsFullData) {
+      if (!state.fullData) {
         try {
-          // Show brief loading indicator on modal stats
           const fullResp = await fetch('data/cpi_data.json');
           if (fullResp.ok) {
             state.fullData = await fullResp.json();
-            if (state.fullData.items && state.fullData.items[code]) {
-              item = state.fullData.items[code];
-            }
           }
         } catch (e) {
           console.warn('Could not fetch full data for item:', e);
@@ -1372,77 +1382,127 @@
         }
       }
 
-      state.modalItem = item;
-      renderModalContent(item);
-    }
-  }
-
-  function renderModalContent(item) {
-    dom.modalTitle.textContent = getItemName(item);
-    const coicop = getCoicopCode(item);
-    dom.modalCoicop.textContent = coicop ? `COICOP: ${coicop} | Code: ${getBfsCode(item)}` : `Code: ${getBfsCode(item)}`;
-
-    const historyObj = getItemHistory(item);
-
-    // Statistics
-    const history = historyObj ? historyObj.yoy : [];
-    let avg12 = '—', min12 = '—', max12 = '—';
-    if (history && history.length > 0) {
-      const last12 = history.slice(-12).filter(v => v !== null && !isNaN(v));
-      if (last12.length > 0) {
-        const sum = last12.reduce((a, b) => a + b, 0);
-        avg12 = (sum / last12.length).toFixed(2) + '%';
-        min12 = Math.min(...last12).toFixed(1) + '%';
-        max12 = Math.max(...last12).toFixed(1) + '%';
+      // Re-resolve items with fullData
+      if (state.fullData && state.fullData.items) {
+        items = codeList.map(c => state.fullData.items[c] || getItem(c)).filter(Boolean);
+        state.modalItem = items;
+        renderModalContent(items);
       }
     }
-
-    dom.modalStatsContainer.innerHTML = `
-      <div class="kpi-card" style="padding:0.75rem;">
-        <span class="kpi-detail-label">${t('stat_latest')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatNum(item.latest ? item.latest.index : 0, 2)} Pts</span>
-      </div>
-      <div class="kpi-card" style="padding:0.75rem;">
-        <span class="kpi-detail-label">${t('yoy_rate')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${formatRateBadge(item.latest ? item.latest.yoy : 0)}</span>
-      </div>
-      <div class="kpi-card" style="padding:0.75rem;">
-        <span class="kpi-detail-label">${t('stat_avg12')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${avg12}</span>
-      </div>
-      <div class="kpi-card" style="padding:0.75rem;">
-        <span class="kpi-detail-label">${t('stat_min12')} / ${t('stat_max12')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${min12} / ${max12}</span>
-      </div>
-      <div class="kpi-card" style="padding:0.75rem;">
-        <span class="kpi-detail-label">${t('stat_weight')}</span>
-        <span class="kpi-detail-val" style="font-size:1.1rem;">${item.weight || 0}%</span>
-      </div>
-    `;
-
-    renderModalChart(item);
   }
 
-  function renderModalChart(item) {
-    const historyObj = getItemHistory(item);
-    if (!window.Chart || !historyObj) return;
+  function renderModalContent(itemOrItems) {
+    const items = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
+    if (items.length === 0) return;
+
+    if (items.length === 1) {
+      const item = items[0];
+      dom.modalTitle.textContent = getItemName(item);
+      const coicop = getCoicopCode(item);
+      dom.modalCoicop.textContent = coicop ? `COICOP: ${coicop} | Code: ${getBfsCode(item)}` : `Code: ${getBfsCode(item)}`;
+
+      const historyObj = getItemHistory(item);
+      const history = historyObj ? historyObj.yoy : [];
+      let avg12 = '—', min12 = '—', max12 = '—';
+      if (history && history.length > 0) {
+        const last12 = history.slice(-12).filter(v => v !== null && !isNaN(v));
+        if (last12.length > 0) {
+          const sum = last12.reduce((a, b) => a + b, 0);
+          avg12 = (sum / last12.length).toFixed(2) + '%';
+          min12 = Math.min(...last12).toFixed(1) + '%';
+          max12 = Math.max(...last12).toFixed(1) + '%';
+        }
+      }
+
+      dom.modalStatsContainer.innerHTML = `
+        <div class="kpi-card" style="padding:0.75rem;">
+          <span class="kpi-detail-label">${t('stat_latest')}</span>
+          <span class="kpi-detail-val" style="font-size:1.1rem;">${formatNum(item.latest ? item.latest.index : 0, 2)} Pts</span>
+        </div>
+        <div class="kpi-card" style="padding:0.75rem;">
+          <span class="kpi-detail-label">${t('yoy_rate')}</span>
+          <span class="kpi-detail-val" style="font-size:1.1rem;">${formatRateBadge(item.latest ? item.latest.yoy : 0)}</span>
+        </div>
+        <div class="kpi-card" style="padding:0.75rem;">
+          <span class="kpi-detail-label">${t('stat_avg12')}</span>
+          <span class="kpi-detail-val" style="font-size:1.1rem;">${avg12}</span>
+        </div>
+        <div class="kpi-card" style="padding:0.75rem;">
+          <span class="kpi-detail-label">${t('stat_min12')} / ${t('stat_max12')}</span>
+          <span class="kpi-detail-val" style="font-size:1.1rem;">${min12} / ${max12}</span>
+        </div>
+        <div class="kpi-card" style="padding:0.75rem;">
+          <span class="kpi-detail-label">${t('stat_weight')}</span>
+          <span class="kpi-detail-val" style="font-size:1.1rem;">${item.weight || 0}%</span>
+        </div>
+      `;
+    } else {
+      // Multiple items (e.g. Inland vs Import or Goods vs Services)
+      const titles = items.map(it => getItemName(it)).join(' vs. ');
+      dom.modalTitle.textContent = titles;
+      const codes = items.map(it => getBfsCode(it)).join(' / ');
+      dom.modalCoicop.textContent = `Vergleich • Codes: ${codes}`;
+
+      const cardsHtml = items.map((it, idx) => {
+        const color = SERIES_COLOR_MAP[it.code] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+        return `
+          <div class="kpi-card" style="padding:0.75rem; border-left: 4px solid ${color};">
+            <div style="font-size:0.75rem; font-weight:700; color:${color}; margin-bottom:0.25rem;">${getItemName(it)}</div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.25rem;">
+              <span class="kpi-detail-val" style="font-size:1.05rem;">${formatNum(it.latest ? it.latest.index : 0, 2)} Pts</span>
+              ${formatRateBadge(it.latest ? it.latest.yoy : 0)}
+            </div>
+            <div style="font-size:0.7rem; color:var(--gray-500); display:flex; justify-content:space-between;">
+              <span>MoM: <strong>${formatNum(it.latest ? it.latest.mom : 0, 1, true)}%</strong></span>
+              <span>${t('weight')} <strong>${it.weight || 0}%</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      dom.modalStatsContainer.innerHTML = cardsHtml;
+    }
+
+    renderModalChart(items);
+  }
+
+  function renderModalChart(itemOrItems) {
+    const items = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
+    if (!window.Chart || items.length === 0) return;
 
     const dates = state.summaryData.meta.dates;
     const { startIdx } = filterDatesByRange(dates, state.modalTimeframe);
     const chartDates = dates.slice(startIdx);
-    const rawData = historyObj[state.modalMetric] || [];
-    const dataSlice = rawData.slice(startIdx);
-
     const metricUnit = state.modalMetric === 'index' ? 'Pts' : '%';
+
+    const datasets = items.map((it, idx) => {
+      const historyObj = getItemHistory(it);
+      const rawData = historyObj ? (historyObj[state.modalMetric] || []) : [];
+      const dataSlice = rawData.slice(startIdx);
+      const color = SERIES_COLOR_MAP[it.code] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+      const isMulti = items.length > 1;
+
+      return {
+        label: getItemName(it),
+        data: dataSlice,
+        borderColor: color,
+        backgroundColor: isMulti ? 'transparent' : 'rgba(37, 99, 235, 0.08)',
+        borderWidth: isMulti ? 2.5 : 2,
+        pointRadius: chartDates.length > 36 ? 0 : 2,
+        pointHoverRadius: 5,
+        tension: 0.15,
+        fill: !isMulti
+      };
+    });
 
     if (state.charts.modal) {
       state.charts.modal.data.labels = chartDates;
-      state.charts.modal.data.datasets[0].label = getItemName(item);
-      state.charts.modal.data.datasets[0].data = dataSlice;
-      state.charts.modal.data.datasets[0].pointRadius = chartDates.length > 36 ? 0 : 2;
+      state.charts.modal.data.datasets = datasets;
+      state.charts.modal.options.plugins.legend.display = items.length > 1;
       state.charts.modal.options.plugins.tooltip.callbacks.label = function (ctx) {
         const v = ctx.parsed.y;
-        return ` ${v !== null ? v.toFixed(2) + ' ' + metricUnit : '—'}`;
+        const lbl = ctx.dataset.label ? `${ctx.dataset.label}: ` : '';
+        return ` ${lbl}${v !== null ? v.toFixed(2) + ' ' + metricUnit : '—'}`;
       };
       state.charts.modal.options.scales.y.ticks.callback = function (val) {
         return val.toFixed(1) + (state.modalMetric === 'index' ? '' : '%');
@@ -1455,17 +1515,7 @@
       type: 'line',
       data: {
         labels: chartDates,
-        datasets: [{
-          label: getItemName(item),
-          data: dataSlice,
-          borderColor: '#1d4ed8',
-          backgroundColor: 'rgba(37, 99, 235, 0.08)',
-          borderWidth: 2,
-          pointRadius: chartDates.length > 36 ? 0 : 2,
-          pointHoverRadius: 5,
-          tension: 0.15,
-          fill: true
-        }]
+        datasets: datasets
       },
       options: {
         responsive: true,
@@ -1473,12 +1523,22 @@
         animation: { duration: 250 },
         normalized: true,
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: items.length > 1,
+            position: 'top',
+            align: 'end',
+            labels: {
+              boxWidth: 12,
+              font: { size: 11, weight: '600' },
+              padding: 10
+            }
+          },
           tooltip: {
             callbacks: {
               label: function (ctx) {
                 const v = ctx.parsed.y;
-                return ` ${v !== null ? v.toFixed(2) + ' ' + metricUnit : '—'}`;
+                const lbl = ctx.dataset.label ? `${ctx.dataset.label}: ` : '';
+                return ` ${lbl}${v !== null ? v.toFixed(2) + ' ' + metricUnit : '—'}`;
               }
             }
           }
@@ -1505,6 +1565,10 @@
   function closeModal() {
     dom.detailModal.classList.remove('open');
     state.modalItem = null;
+    if (state.charts.modal) {
+      state.charts.modal.destroy();
+      state.charts.modal = null;
+    }
   }
 
   // ============================================================================
