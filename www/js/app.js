@@ -449,6 +449,18 @@
     }, 4000);
   }
 
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
   function filterDatesByRange(dates, rangeStr) {
     if (!dates || dates.length === 0) return { startIdx: 0, count: 0 };
     const total = dates.length;
@@ -761,6 +773,8 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 250 },
+        normalized: true,
         interaction: {
           mode: 'index',
           intersect: false
@@ -1132,6 +1146,8 @@
       return;
     }
 
+    const fragment = document.createDocumentFragment();
+
     itemsToDisplay.forEach(item => {
       const canDrill = hasDrilldownChildren(item);
       const tr = document.createElement('tr');
@@ -1194,8 +1210,10 @@
         tr.onclick = () => window.cpiApp.openDetailModal(item.code);
       }
 
-      dom.tableBody.appendChild(tr);
+      fragment.appendChild(tr);
     });
+
+    dom.tableBody.appendChild(fragment);
   }
 
   // Reconstruct exact ancestral path for any node (from 100_100 down to code)
@@ -1367,6 +1385,8 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 250 },
+        normalized: true,
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -1534,11 +1554,13 @@
       });
     });
 
-    // Search input
-    dom.searchInput.addEventListener('input', (e) => {
+    // Search input with debounce to prevent layout thrashing
+    const handleSearchInput = debounce((e) => {
       state.activeSearchTerm = e.target.value;
       renderTableRows();
-    });
+    }, 150);
+
+    dom.searchInput.addEventListener('input', handleSearchInput);
 
     // Table Column Sorting
     document.querySelectorAll('.cpi-table th[data-sort]').forEach(th => {
