@@ -142,6 +142,27 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
       children_map[[p]] <- c(children_map[[p]], c_code)
     }
   }
+
+  # Bereinigung technischer 1:1 Blätter des BFS:
+  # Hat eine Position genau 1 Kind ohne eigene Kinder und identischem Namen,
+  # ist das Kind ein technisches Duplikat. Die Position selbst wird zum echten Blatt.
+  for (i in seq_len(nrow(coicop_df))) {
+    code <- coicop_df[["Code"]][i]
+    ch <- children_map[[code]]
+    if (length(ch) == 1) {
+      ch_code <- ch[1]
+      ch_idx <- which(coicop_df[["Code"]] == ch_code)[1]
+      ch_grand <- children_map[[ch_code]]
+      if (length(ch_grand) == 0 && !is.na(ch_idx)) {
+        p_name <- trimws(as.character(coicop_df[["Position_D"]][i]))
+        c_name <- trimws(as.character(coicop_df[["Position_D"]][ch_idx]))
+        if (tolower(p_name) == tolower(c_name)) {
+          # Kind entfernen: parent ist echtes Blatt
+          children_map[[code]] <- character(0)
+        }
+      }
+    }
+  }
   
   # 6. Lookup für VAR_m1, VAR_m12 und CONTR_m erstellen
   var1_mat <- as.matrix(var_m1_df[, valid_date_cols])

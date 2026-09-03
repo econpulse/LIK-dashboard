@@ -1216,10 +1216,14 @@
   // Check if an item has meaningful children to drill down into
   function hasDrilldownChildren(item) {
     if (!item || !item.children || item.children.length === 0) return false;
+    
+    // Filter actual existing children in dataset
+    const validChildren = item.children.map(c => getItem(c)).filter(Boolean);
+    if (validChildren.length === 0) return false;
+
     // If it only has 1 child and that child has no children and has the exact same name, it's a leaf endpoint
-    if (item.children.length === 1) {
-      const singleChild = getItem(item.children[0]);
-      if (!singleChild) return false;
+    if (validChildren.length === 1) {
+      const singleChild = validChildren[0];
       const childHasChildren = singleChild.children && singleChild.children.length > 0;
       const sameName = getItemName(singleChild).trim().toLowerCase() === getItemName(item).trim().toLowerCase();
       if (!childHasChildren && sameName) {
