@@ -38,7 +38,9 @@
       macro_chart_desc: "Vergleich der zentralen Teuerungsaggregate",
       drivers_title: "Hauptgruppen: Beiträge & Gewichtung",
       drivers_desc: "Analyse der 13 COICOP-Hauptkategorien",
-      btn_contr: "Teuerungsbeitrag (%-Punkte)",
+      btn_contr: "Beitrag MoM",
+      btn_contr_yoy: "Beitrag YoY",
+      btn_delta_yoy: "Δ Beitrag YoY",
       btn_yoy: "YoY-Teuerung (%)",
       btn_weight: "Gewichtung (%)",
       metric_yoy: "Vorjahresrate YoY (%)",
@@ -115,7 +117,9 @@
       macro_chart_desc: "Comparaison des principaux agrégats de prix",
       drivers_title: "Groupes principaux: Contributions & Pondération",
       drivers_desc: "Analyse des 13 catégories principales COICOP",
-      btn_contr: "Contribution (pts %)",
+      btn_contr: "Contrib. MoM",
+      btn_contr_yoy: "Contrib. YoY",
+      btn_delta_yoy: "Δ Contrib. YoY",
       btn_yoy: "Inflation YoY (%)",
       btn_weight: "Pondération (%)",
       metric_yoy: "Variation annuelle YoY (%)",
@@ -192,7 +196,9 @@
       macro_chart_desc: "Confronto tra i principali aggregati dei prezzi",
       drivers_title: "Gruppi principali: Contributi & Ponderazione",
       drivers_desc: "Analisi delle 13 categorie principali COICOP",
-      btn_contr: "Contributo (punti %)",
+      btn_contr: "Contrib. MoM",
+      btn_contr_yoy: "Contrib. YoY",
+      btn_delta_yoy: "Δ Contrib. YoY",
       btn_yoy: "Rincaro YoY (%)",
       btn_weight: "Ponderazione (%)",
       metric_yoy: "Tasso annuo YoY (%)",
@@ -269,7 +275,9 @@
       macro_chart_desc: "Time series comparison of core macro price aggregates",
       drivers_title: "Main Groups: Contributions & Weights",
       drivers_desc: "Breakdown of the 13 COICOP major categories",
-      btn_contr: "Contribution (%-pts)",
+      btn_contr: "Contribution MoM",
+      btn_contr_yoy: "Contribution YoY",
+      btn_delta_yoy: "Δ Contribution YoY",
       btn_yoy: "YoY Inflation (%)",
       btn_weight: "Weighting (%)",
       metric_yoy: "YoY Change (%)",
@@ -593,12 +601,12 @@
             <span class="kpi-detail-val">${core1 ? formatNum(core1.latest.mom, 1, true) + '%' : '—'}</span>
           </div>
           <div class="kpi-detail-item">
-            <span class="kpi-detail-label">${t('spread')}</span>
-            <span class="kpi-detail-val">${core1 && tot ? formatNum(core1.latest.yoy - tot.latest.yoy, 1, true) + '%p' : '—'}</span>
+            <span class="kpi-detail-label">Beitrag YoY</span>
+            <span class="kpi-detail-val">${core1 ? formatNum(core1.latest.contr_yoy, 3, true) + '%p' : '—'}</span>
           </div>
           <div class="kpi-detail-item">
-            <span class="kpi-detail-label">Exkl. Energie/Frische</span>
-            <span class="kpi-detail-val">✓</span>
+            <span class="kpi-detail-label">&Delta; YoY MoM</span>
+            <span class="kpi-detail-val">${core1 ? (core1.latest.delta_contr_yoy > 0 ? '+' : '') + formatNum(core1.latest.delta_contr_yoy, 3) + '%p' : '—'}</span>
           </div>
         </div>
       </div>
@@ -814,34 +822,59 @@
 
     if (mainGroups.length === 0) return;
 
-    // Sort according to current mode
-    let labels = [];
-    let values = [];
-    let colors = [];
-    let sorted = [...mainGroups];
+    // Total-Element (100_100) als Vergleichsbasis holen
+    const totalItem = items['100_100'];
 
-    if (state.driversMode === 'contr') {
-      sorted.sort((a, b) => (b.latest.contr || 0) - (a.latest.contr || 0));
-      labels = sorted.map(it => getItemName(it));
-      values = sorted.map(it => it.latest.contr || 0);
-      colors = values.map(v => v >= 0 ? '#e11d48' : '#059669');
-    } else if (state.driversMode === 'yoy') {
-      sorted.sort((a, b) => (b.latest.yoy || 0) - (a.latest.yoy || 0));
-      labels = sorted.map(it => getItemName(it));
-      values = sorted.map(it => it.latest.yoy || 0);
-      colors = values.map(v => v >= 0 ? '#e11d48' : '#059669');
-    } else if (state.driversMode === 'weight') {
-      sorted.sort((a, b) => (b.weight || 0) - (a.weight || 0));
-      labels = sorted.map(it => getItemName(it));
-      values = sorted.map(it => it.weight || 0);
-      colors = values.map(() => '#1d4ed8');
+    // Helper to get metric value per item according to mode
+    function getDriverVal(it, mode) {
+      if (!it || !it.latest) return 0;
+      if (mode === 'contr') {
+        return it.latest.contr_mom !== undefined ? it.latest.contr_mom : (it.latest.contr || 0);
+      } else if (mode === 'contr_yoy') {
+        return it.latest.contr_yoy !== undefined ? it.latest.contr_yoy : 0;
+      } else if (mode === 'delta_yoy') {
+        return it.latest.delta_contr_yoy !== undefined ? it.latest.delta_contr_yoy : 0;
+      } else if (mode === 'yoy') {
+        return it.latest.yoy !== undefined ? it.latest.yoy : 0;
+      } else if (mode === 'weight') {
+        return it.weight || 0;
+      }
+      return 0;
     }
+
+    // Sort 13 main groups
+    let sorted = [...mainGroups];
+    sorted.sort((a, b) => getDriverVal(b, state.driversMode) - getDriverVal(a, state.driversMode));
+
+    // Optional: Total oben oder unten als Vergleichsbasis anfügen
+    const displayList = totalItem ? [totalItem, ...sorted] : sorted;
+
+    const labels = displayList.map(it => {
+      if (it.code === '100_100') {
+        return `★ ${t('parent_total')} (Headline)`;
+      }
+      return getItemName(it);
+    });
+
+    const values = displayList.map(it => getDriverVal(it, state.driversMode));
+
+    const colors = displayList.map(it => {
+      const isTotal = it.code === '100_100';
+      const val = getDriverVal(it, state.driversMode);
+      if (isTotal) {
+        return '#0f172a'; // Prägnantes Schwarzblau für Total
+      }
+      if (state.driversMode === 'weight') {
+        return '#2563eb';
+      }
+      return val >= 0 ? '#e11d48' : '#059669';
+    });
 
     if (state.charts.drivers) {
       state.charts.drivers.destroy();
     }
 
-    const unit = state.driversMode === 'contr' ? ' %p' : ' %';
+    const unit = (state.driversMode === 'contr' || state.driversMode === 'contr_yoy' || state.driversMode === 'delta_yoy') ? ' %p' : ' %';
 
     state.charts.drivers = new Chart(dom.driversChartCanvas, {
       type: 'bar',
@@ -887,7 +920,7 @@
         onClick: (event, elements) => {
           if (elements.length > 0) {
             const idx = elements[0].index;
-            const clickedItem = sorted[idx];
+            const clickedItem = displayList[idx];
             if (clickedItem) {
               drillDownToNode(clickedItem.code);
               document.getElementById('explorer-section').scrollIntoView({ behavior: 'smooth' });
@@ -922,6 +955,18 @@
       card.className = 'special-card';
       card.onclick = () => window.cpiApp.openDetailModal(code);
 
+      const yoyContrVal = it.latest ? it.latest.contr_yoy : 0;
+      const deltaYoyVal = it.latest ? it.latest.delta_contr_yoy : 0;
+
+      let deltaBadge = '';
+      if (deltaYoyVal !== undefined && deltaYoyVal !== null && deltaYoyVal !== 0) {
+        const sign = deltaYoyVal > 0 ? '+' : '';
+        const dClass = deltaYoyVal > 0 ? 'delta-pos' : 'delta-neg';
+        deltaBadge = `<span class="contr-delta-tag ${dClass}" style="font-weight:600;">&Delta; ${sign}${deltaYoyVal.toFixed(3)}</span>`;
+      } else if (deltaYoyVal === 0 && (yoyContrVal || 0) !== 0) {
+        deltaBadge = `<span class="contr-delta-tag delta-zero">&Delta; 0.000</span>`;
+      }
+
       card.innerHTML = `
         <div class="special-card-header">
           <span>${it.bfs_code || it.code}</span>
@@ -931,6 +976,10 @@
         <div class="special-card-metrics">
           <span class="special-card-index">${formatNum(it.latest.index, 2)}</span>
           ${formatRateBadge(it.latest.yoy)}
+        </div>
+        <div class="special-card-contr-row">
+          <span style="color:var(--gray-600);">Beitrag YoY: <strong class="special-contr-chip">${yoyContrVal !== 0 ? formatNum(yoyContrVal, 3, true) : '0.000'} %p</strong></span>
+          ${deltaBadge}
         </div>
         <div style="margin-top:0.4rem; font-size:0.75rem; color:var(--gray-500); display:flex; justify-content:space-between;">
           <span>MoM: ${formatNum(it.latest.mom, 1, true)}%</span>
