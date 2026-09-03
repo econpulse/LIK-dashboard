@@ -95,15 +95,23 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
   }
   
   # 4. Hierarchie-Erkennung & Aufteilung in COICOP-Baum und Sondergliederungen
+  # Im BFS-Excel gibt es:
+  # 1. Den detaillierten COICOP-Baum (Zeile 1 bis 568, vor dem zweiten "100_100")
+  # 2. Eine redundante Übersicht der 13 Hauptgruppen (Zeile 569 bis 582)
+  # 3. Die Sondergliederungen (ab 110_101, Zeile 583 bis Ende)
   tot_rows <- which(idx_df[["Code"]] == "100_100")
+  special_first <- which(idx_df[["Code"]] == "110_101")[1]
+  
   if (length(tot_rows) > 1) {
     coicop_end_idx <- tot_rows[2] - 1
-    special_start_idx <- tot_rows[2]
+  } else if (!is.na(special_first)) {
+    coicop_end_idx <- special_first - 1
   } else {
     lvl_na <- which(is.na(idx_df[["Level"]]))
     coicop_end_idx <- if (length(lvl_na) > 0) min(lvl_na) - 1 else nrow(idx_df)
-    special_start_idx <- coicop_end_idx + 1
   }
+
+  special_start_idx <- if (!is.na(special_first)) special_first else coicop_end_idx + 1
   
   coicop_df <- idx_df[1:coicop_end_idx, ]
   special_df <- if (special_start_idx <= nrow(idx_df)) idx_df[special_start_idx:nrow(idx_df), ] else data.frame()
