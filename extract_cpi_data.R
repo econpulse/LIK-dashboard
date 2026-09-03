@@ -438,7 +438,7 @@ extract_cpi_file <- function(xlsx_path, output_dir = "www/data") {
 }
 
 # Standalone-Ausführung per CLI
-if (!interactive() && identical(environment(), globalenv())) {
+if (sys.nframe() == 0) {
   args <- commandArgs(trailingOnly = TRUE)
   target_file <- if (length(args) > 0) args[1] else {
     xlsx_files <- list.files(".", pattern = "\\.xlsx$", full.names = TRUE)
