@@ -479,7 +479,8 @@
   // ============================================================================
   async function loadData(forceRefresh = false) {
     try {
-      const cacheBust = forceRefresh ? `?_=${Date.now()}` : '';
+      // Immer Cache-Busting verwenden, damit Browser-Updates sofort sichtbar sind
+      const cacheBust = `?v=${Date.now()}`;
       const summaryResp = await fetch(`data/cpi_summary.json${cacheBust}`);
       if (!summaryResp.ok) throw new Error('Could not load cpi_summary.json');
       state.summaryData = await summaryResp.json();
